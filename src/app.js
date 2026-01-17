@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 
 const authRoutes = require('./routes/auth');
 const walletRoutes = require('./routes/wallet');
@@ -9,21 +8,21 @@ const adminRoutes = require('./routes/admin');
 const app = express();
 
 // ===============================
-// GLOBAL MIDDLEWARE
+// CORS
 // ===============================
 app.use(cors({
-  origin: '*', // OK for testing; restrict in production
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: [
+    "https://demodeposit.netlify.app"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
+// ===============================
+// BODY PARSERS
+// ===============================
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
-
-// ===============================
-// STATIC FILES (FRONTEND)
-// ===============================
-app.use(express.static(path.join(__dirname, '../public')));
 
 // ===============================
 // API ROUTES
@@ -45,14 +44,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ===============================
-// ROOT REDIRECT
-// ===============================
-app.get('/', (req, res) => {
-  res.redirect('/login.html');
-});
-
-// ===============================
-// 404 HANDLER (API + STATIC)
+// 404 HANDLER
 // ===============================
 app.use((req, res) => {
   res.status(404).json({
@@ -66,7 +58,6 @@ app.use((req, res) => {
 // ===============================
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
-
   res.status(err.status || 500).json({
     success: false,
     error: err.message || 'Internal server error'
