@@ -12,7 +12,7 @@ const server = app.listen(PORT, () => {
   console.log('===============================');
   console.log('🚀 Server started successfully');
   console.log(`🌍 Port: ${PORT}`);
-  console.log(`🖥  Frontend: http://localhost:${PORT}/login.html`);
+  console.log(`🖥  Frontend: ${process.env.FRONTEND_URL}`);
   console.log(`⛓  Network: ${process.env.NETWORK || 'BSC'}`);
   console.log('===============================');
 

@@ -2,6 +2,7 @@ const blockchainService = require('../services/blockchain');
 const depositService = require('../services/deposit.service');
 const walletService = require('../services/wallet.service');
 const { ethers } = require('ethers');
+const pool = require('../config/database');
 require('dotenv').config();
 
 class DepositWatcher {
@@ -9,7 +10,8 @@ class DepositWatcher {
     this.lastProcessedBlock = null;
     this.interval = parseInt(process.env.WATCHER_INTERVAL_MS) || 15000;
     this.blockBatch = 500;
-    this.requiredConfirmations = parseInt(process.env.REQUIRED_CONFIRMATIONS);
+    this.requiredConfirmations =
+      parseInt(process.env.REQUIRED_CONFIRMATIONS) || 12;
   }
 
   /* ===============================
@@ -78,9 +80,13 @@ class DepositWatcher {
   =============================== */
   async updateConfirmations() {
     try {
-      const pending = await depositService.getUnconfirmedDeposits();
+      const result = await pool.query(`
+        SELECT id, tx_hash, confirmations
+        FROM transactions
+        WHERE status = 'pending'
+      `);
 
-      for (const tx of pending) {
+      for (const tx of result.rows) {
         const confirmations =
           await blockchainService.getTransactionConfirmations(tx.tx_hash);
 
@@ -102,13 +108,13 @@ class DepositWatcher {
   =============================== */
   async processSweeps() {
     try {
-      const sweeps = await depositService.getUnsweptDeposits();
+      const deposits = await depositService.getDepositsToSweep();
 
-      for (const tx of sweeps) {
+      for (const d of deposits) {
         try {
-          await depositService.sweepDeposit(tx);
+          await depositService.sweepToHotWallet(d.id);
         } catch (err) {
-          console.error(`Sweep failed for tx ${tx.id}:`, err.message);
+          console.error(`Sweep failed txId=${d.id}:`, err.message);
         }
       }
     } catch (err) {
