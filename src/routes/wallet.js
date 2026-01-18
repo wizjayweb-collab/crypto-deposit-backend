@@ -1,21 +1,23 @@
 const express = require('express');
 const router = express.Router();
+
 const walletService = require('../services/wallet.service');
 const depositService = require('../services/deposit.service');
 const db = require('../config/database');
 
 /*
-  DEMO WALLET ROUTES
+  WALLET RULES
   - One wallet per user
-  - Auto-create wallet if missing
+  - Auto-create if missing
 */
 
 /* ===============================
    GET OR CREATE WALLET
+   GET /api/wallet?userId=1
 =============================== */
 router.get('/', async (req, res) => {
   try {
-    const userId = parseInt(req.query.userId);
+    const userId = Number(req.query.userId);
 
     if (!userId) {
       return res.status(400).json({
@@ -37,24 +39,25 @@ router.get('/', async (req, res) => {
       });
     }
 
+    // Get or create wallet
     let wallet = await walletService.getWalletByUserId(userId);
 
     if (!wallet) {
       wallet = await walletService.createWallet(userId);
     }
 
-    res.json({
+    return res.json({
       success: true,
-      data: {
-        walletId: wallet.id,
+      wallet: {
+        id: wallet.id,
         address: wallet.address,
-        balance: parseFloat(wallet.balance),
+        balance: Number(wallet.balance || 0),
         network: 'BEP20 (BSC)'
       }
     });
 
-  } catch (error) {
-    console.error('Get wallet error:', error);
+  } catch (err) {
+    console.error('Get wallet error:', err);
     res.status(500).json({
       success: false,
       message: 'Failed to get wallet'
@@ -64,10 +67,11 @@ router.get('/', async (req, res) => {
 
 /* ===============================
    GET WALLET TRANSACTIONS
+   GET /api/wallet/transactions
 =============================== */
 router.get('/transactions', async (req, res) => {
   try {
-    const userId = parseInt(req.query.userId);
+    const userId = Number(req.query.userId);
 
     if (!userId) {
       return res.status(400).json({
@@ -85,21 +89,22 @@ router.get('/transactions', async (req, res) => {
       });
     }
 
-    const transactions = await depositService.getTransactionsByWallet(wallet.id);
+    const transactions =
+      await depositService.getTransactionsByWallet(wallet.id);
 
-    res.json({
+    return res.json({
       success: true,
-      data: transactions.map(tx => ({
-        txHash: tx.tx_hash,
-        amount: parseFloat(tx.amount),
+      transactions: transactions.map(tx => ({
+        tx_hash: tx.tx_hash,
+        amount: Number(tx.amount),
         status: tx.status,
         confirmations: tx.confirmations,
-        createdAt: tx.created_at
+        created_at: tx.created_at
       }))
     });
 
-  } catch (error) {
-    console.error('Transactions error:', error);
+  } catch (err) {
+    console.error('Transactions error:', err);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch transactions'
@@ -109,10 +114,11 @@ router.get('/transactions', async (req, res) => {
 
 /* ===============================
    GET DEPOSIT ADDRESS
+   GET /api/wallet/deposit-address
 =============================== */
 router.get('/deposit-address', async (req, res) => {
   try {
-    const userId = parseInt(req.query.userId);
+    const userId = Number(req.query.userId);
 
     if (!userId) {
       return res.status(400).json({
@@ -127,21 +133,19 @@ router.get('/deposit-address', async (req, res) => {
       wallet = await walletService.createWallet(userId);
     }
 
-    res.json({
+    return res.json({
       success: true,
-      data: {
+      wallet: {
         address: wallet.address,
         network: 'BEP20 (BSC)',
         token: 'USDT',
         contract: process.env.USDT_CONTRACT_ADDRESS,
-        minDeposit: parseFloat(process.env.MIN_DEPOSIT_USDT),
-        warning:
-          'Send only USDT on BEP20 network. Wrong network or token will result in loss of funds.'
+        minDeposit: Number(process.env.MIN_DEPOSIT_USDT)
       }
     });
 
-  } catch (error) {
-    console.error('Deposit address error:', error);
+  } catch (err) {
+    console.error('Deposit address error:', err);
     res.status(500).json({
       success: false,
       message: 'Failed to get deposit address'
