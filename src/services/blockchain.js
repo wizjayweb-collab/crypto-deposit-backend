@@ -9,7 +9,7 @@ const USDT_ABI = [
   'event Transfer(address indexed from, address indexed to, uint256 value)',
   'function balanceOf(address account) view returns (uint256)',
   'function transfer(address to, uint256 amount) returns (bool)',
-  'function decimals() view returns (uint8)'
+  'function decimals() view returns (uint8)',
 ];
 
 const usdtContract = new ethers.Contract(
@@ -30,20 +30,31 @@ class BlockchainService {
      TOKEN INFO
   =============================== */
   async getUSDTDecimals() {
-    return await usdtContract.decimals();
+    return usdtContract.decimals();
   }
 
   /* ===============================
-     TRANSFER EVENTS
-     (single address)
+     TRANSFER EVENTS (MULTI ADDRESS SAFE)
   =============================== */
-  async getTransferEvents(fromBlock, toBlock, toAddress) {
-    const filter = usdtContract.filters.Transfer(
-      null,
-      ethers.utils.getAddress(toAddress)
+  async getTransferEvents(fromBlock, toBlock, walletAddresses) {
+    // Normalize addresses
+    const addressSet = new Set(
+      walletAddresses.map(a => a.toLowerCase())
     );
 
-    return await usdtContract.queryFilter(filter, fromBlock, toBlock);
+    // No filter on "to" (important!)
+    const filter = usdtContract.filters.Transfer();
+
+    const events = await usdtContract.queryFilter(
+      filter,
+      fromBlock,
+      toBlock
+    );
+
+    // Filter only deposits to our wallets
+    return events.filter(e =>
+      addressSet.has(e.args.to.toLowerCase())
+    );
   }
 
   /* ===============================
@@ -89,7 +100,7 @@ class BlockchainService {
     );
 
     const tx = await contract.transfer(toAddress, amountInWei);
-    await tx.wait(1); // wait 1 confirmation
+    await tx.wait(1);
 
     return tx.hash;
   }
@@ -102,7 +113,7 @@ class BlockchainService {
 
     const tx = await wallet.sendTransaction({
       to: toAddress,
-      value: ethers.utils.parseEther(amount.toString())
+      value: ethers.utils.parseEther(amount.toString()),
     });
 
     await tx.wait(1);

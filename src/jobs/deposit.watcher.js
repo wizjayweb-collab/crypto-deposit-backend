@@ -3,20 +3,16 @@ const depositService = require('../services/deposit.service');
 const walletService = require('../services/wallet.service');
 const { ethers } = require('ethers');
 const pool = require('../config/database');
-require('dotenv').config();
 
 class DepositWatcher {
   constructor() {
     this.lastProcessedBlock = null;
-    this.interval = parseInt(process.env.WATCHER_INTERVAL_MS) || 15000;
+    this.interval = Number(process.env.WATCHER_INTERVAL_MS) || 15000;
     this.blockBatch = 500;
     this.requiredConfirmations =
-      parseInt(process.env.REQUIRED_CONFIRMATIONS) || 12;
+      Number(process.env.REQUIRED_CONFIRMATIONS) || 12;
   }
 
-  /* ===============================
-     START WATCHER
-  =============================== */
   async start() {
     console.log('🔍 Deposit watcher started');
 
@@ -33,9 +29,6 @@ class DepositWatcher {
     }, this.interval);
   }
 
-  /* ===============================
-     SCAN BLOCKS FOR NEW DEPOSITS
-  =============================== */
   async scanBlocks() {
     try {
       const currentBlock = await blockchainService.getCurrentBlock();
@@ -44,7 +37,10 @@ class DepositWatcher {
       if (safeBlock <= this.lastProcessedBlock) return;
 
       const fromBlock = this.lastProcessedBlock + 1;
-      const toBlock = Math.min(fromBlock + this.blockBatch - 1, safeBlock);
+      const toBlock = Math.min(
+        fromBlock + this.blockBatch - 1,
+        safeBlock
+      );
 
       const wallets = await walletService.getAllWalletAddresses();
       if (wallets.length === 0) return;
@@ -58,8 +54,11 @@ class DepositWatcher {
       );
 
       for (const event of events) {
-        const to = event.args.to;
-        const amount = ethers.utils.formatUnits(event.args.value, 18);
+        const to = event.args.to.toLowerCase();
+        const amount = ethers.utils.formatUnits(
+          event.args.value,
+          18
+        );
 
         await depositService.processDeposit(
           event.transactionHash,
@@ -75,9 +74,6 @@ class DepositWatcher {
     }
   }
 
-  /* ===============================
-     UPDATE CONFIRMATIONS
-  =============================== */
   async updateConfirmations() {
     try {
       const result = await pool.query(`
@@ -88,10 +84,15 @@ class DepositWatcher {
 
       for (const tx of result.rows) {
         const confirmations =
-          await blockchainService.getTransactionConfirmations(tx.tx_hash);
+          await blockchainService.getTransactionConfirmations(
+            tx.tx_hash
+          );
 
         if (confirmations !== tx.confirmations) {
-          await depositService.updateConfirmations(tx.id, confirmations);
+          await depositService.updateConfirmations(
+            tx.id,
+            confirmations
+          );
         }
 
         if (confirmations >= this.requiredConfirmations) {
@@ -103,9 +104,6 @@ class DepositWatcher {
     }
   }
 
-  /* ===============================
-     SWEEP CONFIRMED DEPOSITS
-  =============================== */
   async processSweeps() {
     try {
       const deposits = await depositService.getDepositsToSweep();
