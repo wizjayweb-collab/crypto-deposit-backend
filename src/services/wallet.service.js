@@ -3,48 +3,44 @@ const crypto = require('crypto');
 const pool = require('../config/database');
 
 /* ===============================
-   ENCRYPTION CONFIG
+   ENCRYPTION CONFIG (SAFE)
 ================================ */
-const ENCRYPTION_KEY = process.env.ENCRYPTION_SECRET;
-const IV_LENGTH = 16; // AES block size
+const RAW_KEY = process.env.ENCRYPTION_SECRET;
+const IV_LENGTH = 16;
 
-// Must be 32 bytes = 64 hex characters
-if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
-  throw new Error('❌ ENCRYPTION_SECRET must be 32 bytes (64 hex characters)');
+if (!RAW_KEY) {
+  console.error('❌ ENCRYPTION_SECRET is missing');
+  process.exit(1);
 }
 
-const KEY_BUFFER = Buffer.from(ENCRYPTION_KEY, 'hex');
+const CLEAN_KEY = RAW_KEY.trim();
+
+if (!/^[0-9a-fA-F]{64}$/.test(CLEAN_KEY)) {
+  console.error('❌ ENCRYPTION_SECRET must be 64 hex characters');
+  process.exit(1);
+}
+
+const KEY_BUFFER = Buffer.from(CLEAN_KEY, 'hex');
 
 /* ===============================
    ENCRYPT / DECRYPT
 ================================ */
 function encrypt(text) {
   const iv = crypto.randomBytes(IV_LENGTH);
-
-  const cipher = crypto.createCipheriv(
-    'aes-256-cbc',
-    KEY_BUFFER,
-    iv
-  );
+  const cipher = crypto.createCipheriv('aes-256-cbc', KEY_BUFFER, iv);
 
   let encrypted = cipher.update(text, 'utf8');
   encrypted = Buffer.concat([encrypted, cipher.final()]);
 
-  // iv:encrypted
   return iv.toString('hex') + ':' + encrypted.toString('hex');
 }
 
 function decrypt(payload) {
   const [ivHex, encryptedHex] = payload.split(':');
-
   const iv = Buffer.from(ivHex, 'hex');
   const encryptedText = Buffer.from(encryptedHex, 'hex');
 
-  const decipher = crypto.createDecipheriv(
-    'aes-256-cbc',
-    KEY_BUFFER,
-    iv
-  );
+  const decipher = crypto.createDecipheriv('aes-256-cbc', KEY_BUFFER, iv);
 
   let decrypted = decipher.update(encryptedText);
   decrypted = Buffer.concat([decrypted, decipher.final()]);
@@ -60,7 +56,6 @@ class WalletService {
   // CREATE ONE WALLET PER USER
   async createWallet(userId) {
     const client = await pool.connect();
-
     try {
       await client.query('BEGIN');
 
@@ -97,7 +92,7 @@ class WalletService {
     }
   }
 
-  // GET WALLET (SAFE – NO PRIVATE KEY)
+  // GET WALLET (SAFE)
   async getWalletByUserId(userId) {
     const result = await pool.query(
       'SELECT id, user_id, address, balance FROM wallets WHERE user_id = $1',
@@ -106,7 +101,7 @@ class WalletService {
     return result.rows[0];
   }
 
-  // ADMIN / INTERNAL USE ONLY
+  // INTERNAL / ADMIN ONLY
   async getWalletById(walletId) {
     const result = await pool.query(
       'SELECT * FROM wallets WHERE id = $1',
@@ -140,7 +135,6 @@ class WalletService {
     return result.rows.map(r => r.address);
   }
 
-  // DEMO BALANCE UPDATE
   async updateBalance(walletId, amount) {
     await pool.query(
       `
