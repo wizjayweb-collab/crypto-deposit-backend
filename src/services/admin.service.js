@@ -3,13 +3,18 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 class AdminService {
-
-  // ===============================
-  // ADMIN LOGIN
-  // ===============================
+  /* ===============================
+     ADMIN LOGIN
+  =============================== */
   async login(username, password) {
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET not configured');
+    }
+
     const result = await pool.query(
-      'SELECT id, username, password_hash FROM admin_users WHERE username = $1',
+      `SELECT id, username, password_hash
+       FROM admin_users
+       WHERE username = $1`,
       [username]
     );
 
@@ -19,14 +24,13 @@ class AdminService {
 
     const admin = result.rows[0];
 
-    const isValid = await bcrypt.compare(password, admin.password_hash);
+    const isValid = await bcrypt.compare(
+      password,
+      admin.password_hash
+    );
 
     if (!isValid) {
       throw new Error('Invalid credentials');
-    }
-
-    if (!process.env.JWT_SECRET) {
-      throw new Error('JWT_SECRET not configured');
     }
 
     const token = jwt.sign(
@@ -44,9 +48,9 @@ class AdminService {
     };
   }
 
-  // ===============================
-  // DASHBOARD STATS
-  // ===============================
+  /* ===============================
+     DASHBOARD STATS
+  =============================== */
   async getDashboardStats() {
     const [
       usersResult,
@@ -86,21 +90,22 @@ class AdminService {
     };
   }
 
-  // ===============================
-  // ALL USERS (ADMIN VIEW)
-  // ===============================
+  /* ===============================
+     ALL USERS (ADMIN VIEW)
+  =============================== */
   async getAllUsers(limit = 100, offset = 0) {
     const result = await pool.query(
-      `SELECT 
+      `SELECT
           u.id,
           u.email,
           u.created_at,
           w.address,
           COALESCE(w.balance, 0) AS balance,
           COUNT(t.id) AS total_deposits,
-          COALESCE(SUM(
-            CASE WHEN t.status = 'confirmed' THEN t.amount ELSE 0 END
-          ), 0) AS total_deposited
+          COALESCE(
+            SUM(CASE WHEN t.status = 'confirmed' THEN t.amount ELSE 0 END),
+            0
+          ) AS total_deposited
        FROM users u
        LEFT JOIN wallets w ON u.id = w.user_id
        LEFT JOIN transactions t ON w.id = t.wallet_id
@@ -113,12 +118,12 @@ class AdminService {
     return result.rows;
   }
 
-  // ===============================
-  // ALL DEPOSITS
-  // ===============================
+  /* ===============================
+     ALL DEPOSITS
+  =============================== */
   async getAllDeposits(limit = 100, offset = 0) {
     const result = await pool.query(
-      `SELECT 
+      `SELECT
           t.*,
           w.address AS wallet_address,
           u.email AS user_email
@@ -133,12 +138,12 @@ class AdminService {
     return result.rows;
   }
 
-  // ===============================
-  // PENDING DEPOSITS
-  // ===============================
+  /* ===============================
+     PENDING DEPOSITS
+  =============================== */
   async getPendingDeposits() {
     const result = await pool.query(
-      `SELECT 
+      `SELECT
           t.*,
           w.address AS wallet_address,
           u.email AS user_email
