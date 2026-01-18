@@ -2,9 +2,11 @@ const { ethers } = require('ethers');
 const crypto = require('crypto');
 const pool = require('../config/database');
 
-const ENCRYPTION_KEY = process.env.WALLET_ENCRYPTION_KEY; // 32 bytes
+const ENCRYPTION_KEY = process.env.ENCRYPTION_SECRET;
 const IV_LENGTH = 16;
-
+if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 32) {
+  throw new Error('❌ ENCRYPTION_SECRET must be exactly 32 characters');
+}
 /* ===============================
    SIMPLE ENCRYPTION (DEMO)
 ================================ */
